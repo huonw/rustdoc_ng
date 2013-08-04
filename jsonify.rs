@@ -96,7 +96,7 @@ impl ToJson for clean::Type {
         let (n, v) = match self {
             &Unresolved(*) => fail!("no unresolved types should survive to jsonification"),
             &Resolved(n) => (~"resolved", n.to_json()),
-            &External(n) => (~"external", n.to_json()),
+            &External(ref p) => (~"external", p.to_json()),
             &Generic(n) => (~"generic", n.to_json()),
             &Self(n) => (~"self", n.to_json()),
             &Primitive(p) => (~"primitive", match p {
@@ -300,6 +300,7 @@ impl ToJson for clean::Typedef {
         o.insert(~"generics", self.generics.to_json());
         o.insert(~"id", self.id.to_json());
         o.insert(~"attrs", self.attrs.to_json());
+        o.insert(~"source", self.where.to_json());
         Object(o)
     }
 }

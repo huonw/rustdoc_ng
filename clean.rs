@@ -1,5 +1,6 @@
 use its = syntax::parse::token::ident_to_str;
 
+use rustc::metadata::{csearch,decoder};
 use syntax;
 use syntax::ast;
 
@@ -377,8 +378,8 @@ pub enum Type {
     Unresolved(ast::NodeId),
     /// structs/enums/traits (anything that'd be an ast::ty_path)
     Resolved(ast::NodeId),
-    /// Reference to an item in an external crate
-    External(ast::NodeId),
+    /// Reference to an item in an external crate (fully qualified path)
+    External(~str),
     /// For parameterized types, so the consumer of the JSON don't go looking
     /// for types which don't exist anywhere.
     Generic(ast::NodeId),
@@ -813,7 +814,29 @@ fn resolve_type(t: &Type) -> Type {
     };
 
     if def_id.crate != ast::CRATE_NODE_ID {
-        External(def_id.node)
+        let sess = local_data::get(super::ctxtkey, |x| *x.unwrap()).sess;
+        let mut path = ~"";
+        do csearch::each_path(sess.cstore, def_id.crate) |pathstr, deflike, vis| {
+            match deflike {
+                decoder::dl_def(di) => {
+                    let d2 = match di {
+                        def_fn(i, _) => i,
+                        def_ty(i) => i,
+                        def_trait(i) => {
+                            debug!("saw def_trait in def_to_id");
+                            i
+                        },
+                        def_struct(i) => i,
+                        def_mod(i) => i,
+                        x => fail!("def from each_path resolved to something weird %?", x),
+                    };
+                    if def_id.node == d2.node { path = pathstr.to_owned() }
+                },
+                _ => fail!("name resolved to something weird in each_path"),
+            };
+            false
+        };
+        External(path)
     } else {
         Resolved(def_id.node)
     }
